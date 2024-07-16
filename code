@@ -1,0 +1,168 @@
+import requests
+from bs4 import BeautifulSoup
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                  '(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
+
+def search_amazon(name, retries=3):
+    try:
+        name1 = name.replace(" ","-")
+        name2 = name.replace(" ","+")
+        amazon_url = f'https://www.amazon.in/{name1}/s?k={name2}'
+
+        res = requests.get(amazon_url, headers=headers)
+        res.raise_for_status()  # Raise an exception for bad responses
+
+        soup = BeautifulSoup(res.text, 'html.parser')
+
+        amazon_name_elems = soup.select('.a-color-base.a-text-normal')
+        amazon_price_elems = soup.select('.a-price-whole')
+
+        if amazon_name_elems and amazon_price_elems:
+            for name_elem, price_elem in zip(amazon_name_elems, amazon_price_elems):
+                amazon_name = name_elem.getText().strip()
+                amazon_price = price_elem.getText().strip().upper()
+                if name.upper() in amazon_name.upper():
+                    print("Amazon:")
+                    print(amazon_name)
+                    print(f"₹{amazon_price}")
+                    print("---------------------------------")
+                    return amazon_price
+            return '0'  # Return '0' if product not found
+        else:
+            return '0'
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error searching Amazon: {e}")
+        return '0'
+    except Exception as e:
+        print(f"Error: {e}")
+        return '0'
+
+def search_snapdeal(name):
+    try:
+        name1 = name.replace(" ", "-")
+        snapdeal_url = f'https://www.snapdeal.com/search?keyword={name1}'
+
+        res = requests.get(snapdeal_url, headers=headers)
+        res.raise_for_status()  # Raise an exception for bad responses
+
+        soup = BeautifulSoup(res.text, 'html.parser')
+
+        snapdeal_name_elems = soup.select('.product-title')
+        snapdeal_price_elems = soup.select('.product-price')
+
+        for name_elem, price_elem in zip(snapdeal_name_elems, snapdeal_price_elems):
+            snapdeal_name = name_elem.getText().strip()
+            snapdeal_price = price_elem.getText().strip()
+            if name.upper() in snapdeal_name.upper():
+                print("Snapdeal:")
+                print(snapdeal_name)
+                print(snapdeal_price)
+                print("---------------------------------")
+                return snapdeal_price
+
+        return '0'  # Return '0' if product not found
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error searching Snapdeal: {e}")
+        return '0'
+    except Exception as e:
+        print(f"Error: {e}")
+        return '0'
+
+
+def convert_to_numeric(price):
+    try:
+        # Remove non-numeric characters and convert to integer
+        price = ''.join(filter(str.isdigit, price))
+        return int(price)
+    except ValueError:
+        print(f"Error converting price: {price}")
+        return None
+
+
+def compare_prices(snapdeal_price, amazon_price):
+    snapdeal_price_numeric = convert_to_numeric(snapdeal_price)
+    amazon_price_numeric = convert_to_numeric(amazon_price)
+    if snapdeal_price_numeric is None or amazon_price_numeric is None:
+        print("Error converting prices. Comparison aborted.")
+        return
+    if snapdeal_price_numeric < amazon_price_numeric:
+        print("Snapdeal offers a better price.")
+    elif amazon_price_numeric < snapdeal_price_numeric:
+        print("Amazon offers a better price.")
+    else:
+        print("Prices are the same on Snapdeal and Amazon.")
+
+if __name__ == "__main__":
+    name = input("Enter the product name:\n")
+    snapdeal_price = search_snapdeal(name)
+    amazon_price = search_amazon(name)
+    if snapdeal_price == '0':
+        print("Snapdeal: No product found!")
+    else:
+        print(f"\nSnapdeal Price: {snapdeal_price}")
+    if amazon_price == '0':
+        print("Amazon: No product found!")
+    else:
+        print(f"\nAmazon Price: ₹{amazon_price}")
+    compare_prices(snapdeal_price, amazon_price)
+
+
+
+lst = [snapdeal_price, amazon_price]
+lst2 = [int(price) for price in lst if isinstance(price, int) and price > 0]
+if not lst2:
+    print("No relevant product found in all websites....")
+else:
+    min_price = min(lst2)
+    print("_")
+    print("\nMinimum Price: ₹", min_price)
+    if min_price == snapdeal_price:
+        print('\nURL: https://www.snapdeal.com/search?keyword={}\n'.format(name.replace(" ", "-")))
+    elif min_price == amazon_price:
+        print('\nURL: https://www.amazon.in/{}/s?k={}\n'.format(name.replace(" ", "-"), name.replace(" ", "+")))
+    print("---------------------------------------------------------URLs--------------------------------------------------------------")
+    print("Snapdeal : \nhttps://www.snapdeal.com/search?keyword={}".format(name.replace(" ", "-")))
+    print("\nAmazon : \nhttps://www.amazon.in/{}/s?k={}".format(name.replace(" ", "-"), name.replace(" ", "+")))
+    print("---------------------------------------------------------------------------------------------------------------------------")
+
+
+
+
+pip install nltk pandas scikit-learn
+
+
+
+import pandas as pd
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import nltk
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+nltk.download('vader_lexicon')
+
+sid = SentimentIntensityAnalyzer()
+
+df = pd.read_csv('TestReviews.csv')
+
+def get_sentiment(text):
+    score = sid.polarity_scores(text)
+    return score['compound']
+
+df['Sentiment Score'] = df['review'].apply(get_sentiment)
+df['Predicted Label'] = df['Sentiment Score'].apply(lambda x: 1 if x >= 0 else 0)
+
+accuracy = accuracy_score(df['class'], df['Predicted Label'])
+precision = precision_score(df['class'], df['Predicted Label'])
+recall = recall_score(df['class'], df['Predicted Label'])
+f1 = f1_score(df['class'], df['Predicted Label'])
+
+print(f"Accuracy: {accuracy}")
+print(f"Precision: {precision}")
+print(f"Recall: {recall}")
+print(f"F1 Score: {f1}")
+
+df.to_csv('TestReviews_with_Sentiment.csv', index=False)
+print(f"Sentiment analysis results saved to 'TestReviews_with_Sentiment.csv'")
